@@ -92,8 +92,15 @@ def salvar_e_enviar_dados(dados_tecnicos, df_sociais):
     
     for item in dados_tecnicos:
         op = item["Operadora"]
-        indice_social = int(ultima_linha_social[f'Indice_Falha_{op}']) if ultima_linha_social is not None else 0
+        nome_coluna = f'Indice_Falha_{op}'
         
+        # Correção do KeyError: Verifica se a coluna realmente existe antes de ler
+        if ultima_linha_social is not None and nome_coluna in ultima_linha_social:
+            indice_social = int(ultima_linha_social[nome_coluna])
+        else:
+            # Se ninguém reclamou no Google ou a coluna não existe, o índice é 0
+            indice_social = 0
+            
         payload["telemetria"].append({
             "operadora": op,
             "status_http": item["Status_HTTP"],
@@ -109,10 +116,8 @@ def salvar_e_enviar_dados(dados_tecnicos, df_sociais):
         json.dump(payload, f, ensure_ascii=False, indent=4)
     print(f"✅ Salvo localmente em: {caminho_local}")
     
-    # --- NOVO: ENVIO PARA O AWS S3 ---
     print("\n[CLOUD] Iniciando upload para o Amazon S3...")
     try:
-        # Puxa as credenciais do .env invisível
         s3_client = boto3.client(
             's3',
             aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
@@ -121,7 +126,7 @@ def salvar_e_enviar_dados(dados_tecnicos, df_sociais):
         )
         
         bucket_name = os.getenv('S3_BUCKET_NAME')
-        caminho_s3 = f"raw/{nome_arquivo}" # Vai criar uma pasta 'raw' dentro do bucket
+        caminho_s3 = f"raw/{nome_arquivo}"
         
         s3_client.upload_file(caminho_local, bucket_name, caminho_s3)
         print(f"🚀 SUCESSO! Arquivo enviado para s3://{bucket_name}/{caminho_s3}")
