@@ -17,22 +17,27 @@ load_dotenv()
 pytrends = TrendReq(hl='pt-BR', tz=180, retries=3, backoff_factor=0.5)
 
 def coletar_trends_nacional():
-    print("\n[SENSOR SOCIAL] Iniciando coleta Nacional...")
+    print("\n[SENSOR SOCIAL] Iniciando coleta Nacional (Alta Sensibilidade)...")
+    # Termos mais amplos para captar o "ruído de fundo"
     termos_busca = {
-        "Vivo": ["Vivo fora do ar", "Vivo caiu", "Vivo sem sinal", "Vivo internet ruim"],
-        "Claro": ["Claro fora do ar", "Claro caiu", "Claro sem sinal", "Claro net caiu"],
-        "TIM": ["TIM fora do ar", "TIM caiu", "TIM sem sinal", "TIM internet ruim"],
-        "Oi": ["Oi fora do ar", "Oi caiu", "Oi sem sinal", "Oi fibra fora"]
+        "Vivo": ["Vivo internet", "Vivo sinal", "Vivo caiu"],
+        "Claro": ["Claro internet", "Claro sinal", "Claro caiu"],
+        "TIM": ["TIM internet", "TIM sinal", "TIM caiu"],
+        "Oi": ["Oi internet", "Oi sinal", "Oi caiu"]
     }
     
     df_final = pd.DataFrame()
     for operadora, keywords in termos_busca.items():
         try:
-            pytrends.build_payload(keywords, cat=0, timeframe='now 4-H', geo='BR')
+            # Mudamos de 'now 4-H' para 'now 1-d' (Últimas 24 horas)
+            pytrends.build_payload(keywords, cat=0, timeframe='now 1-d', geo='BR')
             df_temp = pytrends.interest_over_time()
             if not df_temp.empty:
                 df_temp = df_temp.drop(columns=['isPartial'])
                 df_final[f'Indice_Falha_{operadora}'] = df_temp.sum(axis=1)
+                print(f"[{operadora}] Sensor captou volume de buscas!") # Log para você ver no GitHub
+            else:
+                print(f"[{operadora}] Zero buscas nas últimas 24h.")
             time.sleep(3)
         except Exception as e:
             print(f"Erro ao consultar {operadora}: {e}")
