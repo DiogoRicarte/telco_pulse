@@ -83,7 +83,7 @@ if dados:
 
     col_status, col_espaco, col_btn_s3, col_btn_github = st.columns([3, 1, 1.5, 1.5])
     with col_status:
-        st.markdown(f"✅ **Última Coleta Confirmada:** {dt_formatada}")
+        st.markdown(f" **Última Coleta Confirmada:** {dt_formatada}")
         st.caption(f"Fonte: AWS S3 ({nome_arquivo[-12:]})")
     with col_btn_s3:
         if st.button("Atualizar Visão", use_container_width=True):
@@ -92,8 +92,8 @@ if dados:
     with col_btn_github:
         if st.button("Solicitar Coleta Manual", use_container_width=True):
             with st.spinner("Acordando robô..."):
-                if disparar_robo_github(): st.toast('Processo de varredura engatilhado no GitHub Actions.', icon='🚀')
-                else: st.toast('Erro: Falha de comunicação com a API do GitHub.', icon='❌')
+                if disparar_robo_github(): st.toast('Processo de varredura engatilhado no GitHub Actions.')
+                else: st.toast('Erro: Falha de comunicação com a API do GitHub.')
 
     st.markdown("<hr style='margin: 10px 0px; border-color: #334155;'>", unsafe_allow_html=True)
     
@@ -123,10 +123,14 @@ if dados:
         with colunas[index]:
             # A mágica do Card Unificado acontece aqui
             with st.container(border=True):
-                if erro != "Nenhum" or latencia > 1000:
+                maior_incidente = max(item['indices_sociais'].values())
+
+                if erro != "Nenhum" or latencia > 1000 or maior_incidente > 70:
                     status_badge = "🔴 INDISPONÍVEL"
-                elif latencia > 350:
+                
+                elif latencia > 350 or maior_incidente > 40:
                     status_badge = "🟡 DEGRADADO"
+                
                 else:
                     status_badge = "🟢 OPERACIONAL"
 

@@ -47,8 +47,9 @@ def coletar_telemetria_social():
                 
                 if not df.empty:
                     df = df.drop(columns=['isPartial'], errors='ignore')
-                    valor = int(df.sum(axis=1).iloc[-1])
-                    resultados_sociais[operadora][nome_regiao] = valor
+                    # vamos pegar as últimas 8 linhas (cerca de 1h de dados) e tiramos a média
+                    media_ultima_hora = df.tail(8).sum(axis=1).mean()
+                    resultados_sociais[operadora][nome_regiao] = media_ultima_hora
                 else:
                     resultados_sociais[operadora][nome_regiao] = 0
                 
