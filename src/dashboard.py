@@ -5,22 +5,46 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-import time
 import requests
 
 load_dotenv()
 
-st.set_page_config(page_title="Telco Pulse | Dashboard", layout="wide")
+st.set_page_config(page_title="Telco Pulse | Monitoramento NOC", layout="wide")
 
+# ==========================================
+# CSS CUSTOMIZADO (Consertado para unificar os cards)
+# ==========================================
 st.markdown("""
     <style>
-    .titulo-dashboard { font-size: 32px !important; font-weight: 700 !important; color: #1E3A8A; margin-bottom: 0px; padding-bottom: 0px; }
-    .subtitulo-dashboard { font-size: 16px !important; color: #6B7280; margin-top: 5px; margin-bottom: 30px; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    html, body, [data-testid="stAppViewContainer"] {
+        font-family: 'Inter', sans-serif !important;
+        background-color: #0f172a !important; 
+    }
+    
+    .titulo-dashboard { font-size: 26px !important; font-weight: 700 !important; color: #f8fafc; margin-bottom: 0px; padding-bottom: 0px; }
+    .subtitulo-dashboard { font-size: 14px !important; color: #94a3b8; margin-top: 5px; margin-bottom: 25px; }
+
+    /* Estilo dos Rótulos das Métricas para não truncar o texto */
+    div[data-testid="stMetricLabel"] { color: #94a3b8 !important; font-size: 13px !important; font-weight: 500 !important; }
+    div[data-testid="stMetricValue"] { color: #f8fafc !important; font-size: 28px !important; font-weight: 700 !important; }
+
+    /* Botões Clean */
+    .stButton > button {
+        background-color: #1e293b !important; color: #e2e8f0 !important;
+        border: 1px solid #334155 !important; border-radius: 4px !important;
+        font-weight: 500 !important;
+    }
+    .stButton > button:hover { border-color: #60a5fa !important; color: #60a5fa !important; }
+
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<p class="titulo-dashboard">Painel de Telemetria: Telco Pulse</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitulo-dashboard">Monitoramento contínuo de latência e disponibilidade de redes nacionais.</p>', unsafe_allow_html=True)
+# Cabeçalho Limpo
+st.markdown('<p class="titulo-dashboard">Monitoramento de Infraestrutura: Telco Pulse</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitulo-dashboard">NOC Dashboard - Conectividade TCP e Volume de Incidentes Sociais.</p>', unsafe_allow_html=True)
 
 @st.cache_data(ttl=60)
 def buscar_ultimo_dado_s3():
@@ -38,105 +62,95 @@ def buscar_ultimo_dado_s3():
             arquivos_ordenados = sorted(objetos['Contents'], key=lambda x: x['LastModified'], reverse=True)
             ultimo_arquivo = arquivos_ordenados[0]['Key']
             resposta = s3.get_object(Bucket=bucket, Key=ultimo_arquivo)
-            conteudo_json = json.loads(resposta['Body'].read().decode('utf-8'))
-            return conteudo_json, ultimo_arquivo
+            return json.loads(resposta['Body'].read().decode('utf-8')), ultimo_arquivo
         return None, None
-    except Exception as e:
+    except Exception:
         return None, None
 
 def disparar_robo_github():
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPO")
     url = f"https://api.github.com/repos/{repo}/actions/workflows/coleta_automatica.yml/dispatches"
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "Authorization": f"Bearer {token}",
-        "X-GitHub-Api-Version": "2022-11-28"
-    }
-    data = {"ref": "main"} 
-    resposta = requests.post(url, headers=headers, json=data)
+    headers = {"Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}", "X-GitHub-Api-Version": "2022-11-28"}
+    resposta = requests.post(url, headers=headers, json={"ref": "main"})
     return resposta.status_code == 204
 
 dados, nome_arquivo = buscar_ultimo_dado_s3()
 
 if dados:
     dt_utc = datetime.fromisoformat(dados['timestamp'])
-    dt_brasilia = dt_utc - timedelta(hours=3)
-    dt_formatada = dt_brasilia.strftime('%d/%m/%Y às %H:%M:%S')
+    dt_formatada = (dt_utc - timedelta(hours=3)).strftime('%H:%M:%S (BRT)')
 
-    # Controles Superiores
-    col_status, col_espaco, col_btn_s3, col_btn_github = st.columns([4, 1, 2, 2])
+    col_status, col_espaco, col_btn_s3, col_btn_github = st.columns([3, 1, 1.5, 1.5])
     with col_status:
-        st.markdown(f"**Última leitura registrada:** {dt_formatada} (Horário de Brasília)")
+        st.markdown(f"✅ **Última Coleta Confirmada:** {dt_formatada}")
+        st.caption(f"Fonte: AWS S3 ({nome_arquivo[-12:]})")
     with col_btn_s3:
-        if st.button("🔄 Atualizar Tela", use_container_width=True):
+        if st.button("Atualizar Visão", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
     with col_btn_github:
-        if st.button("🚀 Forçar Nova Coleta", use_container_width=True):
-            with st.spinner("Acordando robô no GitHub..."):
-                sucesso = disparar_robo_github()
-                if sucesso:
-                    st.success("✅ Ordem enviada! O robô leva cerca de 6 minutos para varrer o Brasil. Aguarde para atualizar.")
-                else:
-                    st.error("❌ Falha ao contatar o GitHub. Verifique o GITHUB_TOKEN no .env")
+        if st.button("Solicitar Coleta Manual", use_container_width=True):
+            with st.spinner("Acordando robô..."):
+                if disparar_robo_github(): st.toast('Processo de varredura engatilhado no GitHub Actions.', icon='🚀')
+                else: st.toast('Erro: Falha de comunicação com a API do GitHub.', icon='❌')
 
-    st.markdown("---")
+    st.markdown("<hr style='margin: 10px 0px; border-color: #334155;'>", unsafe_allow_html=True)
     
-    # SELETOR DE ESTADO
+    # SELETOR DE REGIAO
     lista_regioes = ['Nacional', 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']
-    regiao_selecionada = st.selectbox("📍 Selecione a Região para Análise de Falhas (Google Trends):", lista_regioes, index=0)
+    col_sel, col_empty = st.columns([3, 4])
+    with col_sel:
+        regiao_selecionada = st.selectbox("Seletor Regional de Incidentes (Google Trends):", lista_regioes, index=0)
     
-    st.markdown("---")
-    
+    st.write("")
     colunas = st.columns(4)
-    
-    # Preparando os dados para os cards e para a tabela de forma limpa
     df_view = []
+    
+    # Dicionário com as cores oficiais das marcas para o tema escuro
+    cores_marcas = {"Vivo": "#a855f7", "Claro": "#ef4444", "TIM": "#3b82f6", "Oi": "#eab308"}
     
     for index, item in enumerate(dados['telemetria']):
         operadora = item['operadora']
         latencia = item['latencia_ms']
         erro = item['erro_tecnico']
-        
-        # Pega o índice apenas do estado que o usuário escolheu na caixinha
+        status_http = item.get('status_http', 200) # Busca o código de retorno
         indice = item['indices_sociais'].get(regiao_selecionada, 0)
+        cor_marca = cores_marcas.get(operadora, "#f8fafc")
         
-        # Salva na lista para mostrar na tabela lá embaixo
-        df_view.append({
-            "Operadora": operadora,
-            "Latência (ms)": latencia,
-            "Status HTTP": item["status_http"],
-            f"Buscas ({regiao_selecionada})": indice,
-            "Erro Técnico": erro
-        })
+        df_view.append({"Operadora": operadora, "Ping (ms)": latencia, "Retorno": status_http, "Diagnóstico": erro, f"Alertas ({regiao_selecionada})": indice})
         
-        # Desenha os Cards
         with colunas[index]:
-            if erro != "Nenhum" and erro != "HTTP 403" or latencia > 2000:
-                status_cor = "🔴 FALHA"
-            elif latencia > 500:
-                status_cor = "🟡 INSTÁVEL"
-            else:
-                status_cor = "🟢 OPERACIONAL"
+            # A mágica do Card Unificado acontece aqui
+            with st.container(border=True):
+                if erro != "Nenhum" or latencia > 1000:
+                    status_badge = "🔴 INDISPONÍVEL"
+                elif latencia > 350:
+                    status_badge = "🟡 DEGRADADO"
+                else:
+                    status_badge = "🟢 OPERACIONAL"
 
-            st.markdown(f"### {operadora}")
-            st.markdown(f"**Status:** {status_cor}")
-            
-            col_metrica1, col_metrica2 = st.columns(2)
-            with col_metrica1:
-                st.metric(label="Latência", value=f"{latencia} ms")
-            with col_metrica2:
-                # O label da métrica muda dinamicamente dependendo do estado escolhido!
-                st.metric(label=f"Alertas ({regiao_selecionada})", value=indice)
-            
-            st.write("") 
+                # Título com a cor da marca
+                st.markdown(f"<h3 style='margin-bottom:0px; margin-top:0px; color:{cor_marca};'>{operadora}</h3>", unsafe_allow_html=True)
+                
+                # Prova Técnica visível
+                st.markdown(f"**Status:** {status_badge}")
+                if erro == "Nenhum":
+                    st.markdown(f"<p style='color:#10b981; font-family:monospace; margin-bottom:15px;'>Retorno: {status_http} OK</p>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<p style='color:#ef4444; font-family:monospace; margin-bottom:15px;'>Erro: {erro}</p>", unsafe_allow_html=True)
+                
+                # Métricas lado a lado sem truncar
+                col_met1, col_met2 = st.columns(2)
+                with col_met1:
+                    st.metric(label="Ping (ms)", value=latencia)
+                with col_met2:
+                    st.metric(label="Buscas", value=indice)
 
-    st.markdown("---")
+    st.markdown("<hr style='margin: 20px 0px; border-color: #334155;'>", unsafe_allow_html=True)
     
-    with st.expander("Visualizar Tabela de Dados Consolidados"):
+    with st.expander("Visualizar Base de Dados Bruta (S3 Lake)"):
         st.dataframe(pd.DataFrame(df_view), use_container_width=True)
-        st.caption(f"Fonte de dados: s3://{os.getenv('S3_BUCKET_NAME')}/{nome_arquivo}")
 
 else:
-    st.error("Não foi possível carregar os dados. Verifique a conexão com a AWS.")
+    st.error("Não foi possível carregar os dados do Amazon S3.")

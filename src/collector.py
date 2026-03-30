@@ -2,6 +2,7 @@ import json
 import time
 import os
 import requests
+import socket
 from datetime import datetime
 from pytrends.request import TrendReq
 import boto3
@@ -66,37 +67,47 @@ def coletar_telemetria_social():
     return resultados_sociais
 
 def testar_ping_operadoras():
-    print("\n[SENSOR TÉCNICO] Iniciando testes de rede...")
+    print("\n[SENSOR TÉCNICO] Iniciando testes de rede (TCP Socket Ping)...")
+    import socket # Importamos a biblioteca de rede de baixo nível
+    
+    # Agora usamos apenas os domínios limpos, sem https://
     alvos = {
-        "Vivo": "https://www.vivo.com.br",
-        "Claro": "https://www.claro.com.br",
-        "TIM": "https://www.tim.com.br",
-        "Oi": "https://www.oi.com.br"
+        "Vivo": "www.vivo.com.br",
+        "Claro": "www.claro.com.br",
+        "TIM": "www.tim.com.br",
+        "Oi": "www.oi.com.br"
     }
     resultados = []
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
-    for operadora, url in alvos.items():
+    for operadora, dominio in alvos.items():
         try:
             inicio = time.time()
-            resposta = requests.get(url, headers=headers, timeout=5)
+            # Cria a conexão TCP
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            # Tenta conectar apenas na porta 443 (sem baixar o site)
+            sock.connect((dominio, 443))
+            sock.close()
+            
             latencia = int((time.time() - inicio) * 1000)
             
             resultados.append({
                 "operadora": operadora,
-                "status_http": resposta.status_code,
+                "status_http": 200, # Consideramos OK pois a porta conectou
                 "latencia_ms": latencia,
-                "erro_tecnico": "Nenhum" if resposta.status_code == 200 else f"HTTP {resposta.status_code}"
+                "erro_tecnico": "Nenhum"
             })
-            print(f"  -> {operadora}: {latencia}ms")
-        except requests.exceptions.RequestException as e:
+            print(f"  -> {operadora}: {latencia}ms (TCP Real)")
+            
+        except Exception as e:
             resultados.append({
                 "operadora": operadora,
                 "status_http": 0,
                 "latencia_ms": 5000,
-                "erro_tecnico": "Timeout"
+                "erro_tecnico": "TCP Timeout / Falha de Rota"
             })
             print(f"  -> {operadora}: FALHA CRÍTICA")
+            
     return resultados
 
 def salvar_e_enviar_dados(dados_tecnicos, dados_sociais):
