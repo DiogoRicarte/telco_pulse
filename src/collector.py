@@ -24,7 +24,6 @@ def coletar_telemetria_social():
         "Oi": ["Oi internet", "Oi caiu", "Oi fora do ar", "Oi sem sinal", "Oi falha"]
     }
     
-    # Dicionário completo do Brasil
     regioes = {
         'BR': 'Nacional', 
         'BR-AC': 'AC', 'BR-AL': 'AL', 'BR-AP': 'AP', 'BR-AM': 'AM', 'BR-BA': 'BA', 
@@ -48,65 +47,62 @@ def coletar_telemetria_social():
                 
                 if not df.empty:
                     df = df.drop(columns=['isPartial'], errors='ignore')
-                    # Soma o impacto das 5 palavras-chave
                     valor = int(df.sum(axis=1).iloc[-1])
                     resultados_sociais[operadora][nome_regiao] = valor
                 else:
                     resultados_sociais[operadora][nome_regiao] = 0
                 
                 print(f"  -> {nome_regiao}: {resultados_sociais[operadora][nome_regiao]}")
-                
-                # Freio de segurança: 3 segundos de pausa para o Google não bloquear a API
                 time.sleep(3) 
                 
             except Exception as e:
                 print(f"  -> Erro ao consultar {nome_regiao}: Bloqueio de API ou Sem Dados")
                 resultados_sociais[operadora][nome_regiao] = 0
-                time.sleep(5) # Se der erro, freia mais forte
+                time.sleep(5)
                 
     return resultados_sociais
 
 def testar_ping_operadoras():
-    print("\n[SENSOR TÉCNICO] Iniciando testes de rede (TCP Socket Ping)...")
-    import socket # Importamos a biblioteca de rede de baixo nível
+    print("\n[SENSOR TÉCNICO] Iniciando testes de rede (TCP Socket Ping na Porta 53)...")
     
-    # Agora usamos apenas os domínios limpos, sem https://
     alvos = {
-        "Vivo": "www.vivo.com.br",
-        "Claro": "www.claro.com.br",
-        "TIM": "www.tim.com.br",
-        "Oi": "www.oi.com.br"
+        "Vivo": {"alvo": "200.204.0.10", "porta": 53},
+        "Claro": {"alvo": "200.255.255.65", "porta": 53},
+        "TIM": {"alvo": "200.179.64.65", "porta": 53},
+        "Oi": {"alvo": "200.222.0.34", "porta": 53}
     }
     resultados = []
     
-    for operadora, dominio in alvos.items():
+    for operadora, info in alvos.items():
+        ip = info["alvo"]     
+        porta = info["porta"] 
+        
         try:
             inicio = time.time()
-            # Cria a conexão TCP
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(5)
-            # Tenta conectar apenas na porta 443 (sem baixar o site)
-            sock.connect((dominio, 443))
+            
+            sock.connect((ip, porta))
             sock.close()
             
             latencia = int((time.time() - inicio) * 1000)
             
             resultados.append({
                 "operadora": operadora,
-                "status_http": 200, # Consideramos OK pois a porta conectou
+                "status_http": 200, 
                 "latencia_ms": latencia,
                 "erro_tecnico": "Nenhum"
             })
-            print(f"  -> {operadora}: {latencia}ms (TCP Real)")
+            print(f"  -> {operadora}: {latencia}ms (TCP Real Porta {porta})")
             
         except Exception as e:
             resultados.append({
                 "operadora": operadora,
                 "status_http": 0,
                 "latencia_ms": 5000,
-                "erro_tecnico": "TCP Timeout / Falha de Rota"
+                "erro_tecnico": f"Falha de Rota no IP {ip}"
             })
-            print(f"  -> {operadora}: FALHA CRÍTICA")
+            print(f"  -> {operadora}: FALHA CRÍTICA ({e})")
             
     return resultados
 
@@ -121,7 +117,6 @@ def salvar_e_enviar_dados(dados_tecnicos, dados_sociais):
     
     for item in dados_tecnicos:
         op = item["operadora"]
-        # Injetamos o dicionário inteiro com os 28 valores (BR + 27 Estados) dentro da operadora
         item["indices_sociais"] = dados_sociais[op]
         payload["telemetria"].append(item)
         
@@ -130,7 +125,7 @@ def salvar_e_enviar_dados(dados_tecnicos, dados_sociais):
     
     with open(caminho_local, 'w', encoding='utf-8') as f:
         json.dump(payload, f, ensure_ascii=False, indent=4)
-    print(f"✅ Salvo localmente em: {caminho_local}")
+    print(f" Salvo localmente em: {caminho_local}")
     
     try:
         s3_client = boto3.client(
@@ -143,9 +138,9 @@ def salvar_e_enviar_dados(dados_tecnicos, dados_sociais):
         caminho_s3 = f"raw/{nome_arquivo}"
         
         s3_client.upload_file(caminho_local, bucket_name, caminho_s3)
-        print(f"🚀 SUCESSO! Arquivo S3: s3://{bucket_name}/{caminho_s3}")
+        print(f" SUCESSO! Arquivo S3: s3://{bucket_name}/{caminho_s3}")
     except Exception as e:
-        print(f"❌ Erro S3: {e}")
+        print(f" Erro S3: {e}")
 
 if __name__ == "__main__":
     dados_sociais = coletar_telemetria_social()
