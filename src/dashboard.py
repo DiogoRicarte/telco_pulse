@@ -312,7 +312,7 @@ def buscar_ultimo_dado_s3():
 def disparar_robo_github():
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPO")
-    url = f"https://api.github.com/repos/{repo}/actions/workflows/coleta_automatica.yml/dispatches"
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/coleta_telco.yml/dispatches"
     headers = {"Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}", "X-GitHub-Api-Version": "2022-11-28"}
     resposta = requests.post(url, headers=headers, json={"ref": "main"})
     return resposta.status_code == 204
