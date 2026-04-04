@@ -7,6 +7,7 @@ import plotly.express as px
 from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
 import requests
+import time
 
 load_dotenv()
 
@@ -349,21 +350,36 @@ if dados:
         </div>
         """, unsafe_allow_html=True)
     
+    # Inicializa o cronômetro zerado na memória do Streamlit
+    if 'ultimo_clique' not in st.session_state:
+        st.session_state.ultimo_clique = 0
+        
+    agora = time.time()
+    tempo_restante = 60 - (agora - st.session_state.ultimo_clique)
+    pode_clicar = tempo_restante <= 0
+
     with col_refresh:
         if st.button("Atualizar", use_container_width=True, key="btn_refresh"):
             st.cache_data.clear()
             st.rerun()
     
     with col_manual:
-        if st.button("Coleta Manual", use_container_width=True, key="btn_manual"):
-            with st.spinner("Ativando sensor..."):
-                if disparar_robo_github():
-                    st.toast('Processo ativado no GitHub Actions')
-                else:
-                    st.toast('Falha na comunicação com API GitHub')
-    
+        # Se já passou 1 minuto, mostra o botão normal
+        if pode_clicar:
+            if st.button("Coleta Manual", use_container_width=True, key="btn_manual"):
+                with st.spinner("Ativando sensor em São Paulo..."):
+                    if disparar_robo_github():
+                        # Registra o momento exato do clique
+                        st.session_state.ultimo_clique = time.time() 
+                        st.toast('Processo ativado no GitHub Actions!')
+                        st.info(" Comando enviado! O robô leva cerca de 10 minutos para rodar. Volte e clique em 'Atualizar' em breve.")
+                    else:
+                        st.error('Falha na comunicação com a API do GitHub.')
+        # Se não passou 1 minuto, mostra o botão bloqueado com a contagem regressiva
+        else:
+            st.button(f"Aguarde ({int(tempo_restante)}s)", use_container_width=True, key="btn_manual_disabled", disabled=True)
+            
     st.markdown('<div class="elegant-divider"></div>', unsafe_allow_html=True)
-    
     # ==========================================
     # SELETOR DE REGIÃO
     # ==========================================

@@ -1,16 +1,21 @@
 name: Bot de Coleta Telco-Pulse
 
+# Se uma requisição for feita para rodar o workflow enquanto ele já estiver rodando, a execução anterior será cancelada e a nova execução começará. Isso é útil para evitar que múltiplas execuções do mesmo workflow sejam feitas ao mesmo tempo, o que pode causar problemas de concorrência ou sobrecarga no sistema.
+concurrency:
+  group: coleta-dados
+  cancel-in-progress: true
+
 # Define QUANDO o robô vai rodar
 on:
   schedule:
-    # Roda a cada 1h (sintaxe do cron do Linux)
+    # Roda a cada 50m (sintaxe do cron do Linux)
     - cron: '50 * * * *'
-  # Permite que você clique em um botão para rodar manualmente se quiser
+  # Permite que clique em um botão para rodar manualmente 
   workflow_dispatch:
 
 jobs:
   coletar_dados:
-    runs-on: self-hosted # Roda em um servidor que você controla (pode ser o seu PC, por exemplo)
+    runs-on: self-hosted 
     steps:
     - name: Baixar o código do repositório
       uses: actions/checkout@v3
