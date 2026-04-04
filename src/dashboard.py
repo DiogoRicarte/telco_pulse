@@ -536,7 +536,10 @@ if dados:
         
         for estado, valor in sociais.items():
             if estado != 'Nacional':
-                estado_totais[estado] = estado_totais.get(estado, 0) + valor
+                # CORREÇÃO: Pegamos o Maior Risco (max) em vez de somar.
+                # Isso trava o gráfico na escala real do Google (0 a 100) e elimina distorções noturnas.
+                atual = estado_totais.get(estado, 0)
+                estado_totais[estado] = max(atual, valor)
     
     # Top 5 Estados
     top5_estados = sorted(estado_totais.items(), key=lambda x: x[1], reverse=True)[:5]
