@@ -39,7 +39,7 @@ OPERADORAS_ALVOS = {
 }
 
 # Timings para respeitar limites de rate do Google Trends
-DELAY_ENTRE_REGIOES = 3  # segundos
+DELAY_ENTRE_REGIOES = 1.5  # segundos
 DELAY_FALHA_API = 5      # segundos após erro
 
 def coletar_telemetria_social() -> Dict[str, Dict[str, float]]:
@@ -62,7 +62,7 @@ def coletar_telemetria_social() -> Dict[str, Dict[str, float]]:
         for geo_code, nome_regiao in REGIOES_BR.items():
             try:
                 # Consulta o volume de buscas dos últimos 1 dia nesta região
-                pytrends.build_payload(keywords, cat=0, timeframe='now 1-d', geo=geo_code)
+                pytrends.build_payload(keywords, cat=0, timeframe='now 4-H', geo=geo_code)
                 df = pytrends.interest_over_time()
                 
                 if not df.empty:
